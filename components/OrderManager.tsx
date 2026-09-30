@@ -5,6 +5,8 @@ import { exportOrdersToExcel } from '../services/excelService';
 import { readDraft, blankDraft } from '../services/orderDraft';
 import { categoryLabel, currencyOf } from '../services/catalog';
 import { versionOf } from '../services/workspaceData';
+import { MotionPresence } from './Motion';
+import { useFeedback } from './Feedback';
 
 interface OrderManagerProps {
   products: Product[];
@@ -40,6 +42,7 @@ const generateId = () => {
 };
 
 const OrderManager: React.FC<OrderManagerProps> = ({ products, orders, setOrders, activeBatch, memberGroups, productTypes, draftStorageKey }) => {
+  const notify = useFeedback();
   // --- Create Order State ---
   const [initialDraft] = useState(() => { try { return { ...readDraft(localStorage, draftStorageKey), error: '' }; } catch { return { ...blankDraft(), error: '此檔期草稿無法讀取，原始內容已保留，請下載原始草稿備份。' }; } });
   const [customerName, setCustomerName] = useState(initialDraft.customerName);
@@ -239,6 +242,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ products, orders, setOrders
     };
 
     setOrders(prev => [newOrder, ...prev]);
+    notify('訂單已建立', '已加入目前檔期，草稿已清空');
 
     setCustomerName('');
     setCart([]);
@@ -288,6 +292,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ products, orders, setOrders
       return o;
     }));
     closeEditModal();
+    notify('訂單已更新', '既有品項依編輯內容保留');
   };
 
   const removeEditItem = (index: number) => {
@@ -477,7 +482,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ products, orders, setOrders
 
         {/* Left Column: Create Order Form */}
         <div className="lg:col-span-4 min-w-0 space-y-6">
-          <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200">
+          <div className="surface-panel bg-white p-4 md:p-6 rounded-xl border border-slate-200">
             <div className="flex items-center justify-between mb-4">
               <h2 className="manager-title text-lg font-bold text-slate-800 flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5 text-blue-600" /> 建立訂單
@@ -641,7 +646,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ products, orders, setOrders
               </div>
 
               <button
-                onClick={() => { void exportOrdersToExcel(sortedOrders, activeBatch.name).catch(() => alert('匯出失敗，請重試。')); }}
+                onClick={() => { void exportOrdersToExcel(sortedOrders, activeBatch.name).then(() => notify('訂單已匯出', `${sortedOrders.length} 筆訂單已整理成 Excel`)).catch(() => alert('匯出失敗，請重試。')); }}
                 disabled={sortedOrders.length === 0}
                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-blue-200 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
@@ -676,7 +681,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ products, orders, setOrders
                     </div>
                  ) : (
                     sortedOrders.map((order) => (
-                        <div key={order.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 relative">
+                        <div key={order.id} className="surface-panel bg-white rounded-xl border border-slate-200 shadow-sm p-4 relative">
                             {/* Header */}
                             <div className="flex justify-between items-start mb-3">
                                 <div>
@@ -844,14 +849,15 @@ const OrderManager: React.FC<OrderManagerProps> = ({ products, orders, setOrders
       </div>
 
       {/* Edit Order Modal */}
-      {editingOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
-          <div role="dialog" aria-modal="true" aria-label="編輯訂單" className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+      <MotionPresence show={!!editingOrder} onDismiss={closeEditModal}>
+        {editingOrder && <div className="dialog-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+          <div role="dialog" aria-modal="true" aria-label="編輯訂單" className="dialog-panel bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center p-4 md:p-6 border-b border-slate-100">
               <h3 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
                 <Pencil className="w-5 h-5 text-blue-600" /> 編輯訂單
               </h3>
               <button
+                aria-label="關閉編輯訂單"
                 onClick={closeEditModal}
                 className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100"
               >
@@ -990,8 +996,8 @@ const OrderManager: React.FC<OrderManagerProps> = ({ products, orders, setOrders
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>}
+      </MotionPresence>
     </>
   );
 };

@@ -93,11 +93,14 @@ try {
   const imagePath = fileURLToPath(new URL('../docs/images/', import.meta.url)); await mkdir(imagePath, { recursive: true });
   for (const width of [390, 1440]) {
     const { context, page, tab, errors } = await setup(width);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.getByRole('button', { name: '載入示範資料', exact: true }).click();
     await expect(page.getByRole('status')).toHaveText('顯示 3 / 3 筆訂單（目前檔期）');
-    await page.screenshot({ path: `${imagePath}/orders-${width}.png`, fullPage: true });
-    await tab('products').click(); await noOverflow(page); await page.screenshot({ path: `${imagePath}/products-${width}.png`, fullPage: true });
-    await tab('summary').click(); await noOverflow(page); await page.screenshot({ path: `${imagePath}/summary-${width}.png`, fullPage: true });
+    await page.getByRole('button', { name: '關閉通知', exact: true }).click();
+    await expect(page.locator('.feedback-toast')).toHaveCount(0);
+    await page.screenshot({ path: `${imagePath}/orders-${width}.png`, fullPage: true, animations: 'disabled' });
+    await tab('products').click(); await noOverflow(page); await page.screenshot({ path: `${imagePath}/products-${width}.png`, fullPage: true, animations: 'disabled' });
+    await tab('summary').click(); await noOverflow(page); await page.screenshot({ path: `${imagePath}/summary-${width}.png`, fullPage: true, animations: 'disabled' });
     assert.deepEqual(errors, []); await context.close();
   }
   console.log('PASS explicit guest demo and public screenshots contain synthetic data only');

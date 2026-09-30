@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { X, Cloud, Check, AlertTriangle, LogOut } from 'lucide-react';
+import { X, Cloud, Check, AlertTriangle, LogOut, UserCircle } from 'lucide-react';
 import { loginWithGoogle, logoutFirebase } from '../services/cloudService';
+import { MotionPresence } from './Motion';
 
 interface CloudSettingsProps {
   isOpen: boolean;
@@ -14,8 +15,6 @@ const CloudSettings: React.FC<CloudSettingsProps> = ({
   isOpen, onClose, user, syncStatus
 }) => {
   const [loginError, setLoginError] = useState('');
-
-  if (!isOpen) return null;
 
   const handleLogin = async () => {
       setLoginError('');
@@ -73,11 +72,8 @@ const CloudSettings: React.FC<CloudSettingsProps> = ({
 
   const UserProfileView = () => (
     <div className="text-center py-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-         <img
-            src={user?.photoURL || 'https://via.placeholder.com/150'}
-            alt="Profile"
-            className="w-24 h-24 rounded-full border-4 border-green-100 shadow-sm mx-auto mb-4"
-        />
+        {user?.photoURL ? <img src={user.photoURL} alt="帳號頭像" className="w-24 h-24 rounded-full border-4 border-blue-100 mx-auto mb-4" /> :
+          <div className="w-24 h-24 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4"><UserCircle size={48} /></div>}
         <h3 className="font-bold text-xl text-slate-800">{user?.displayName}</h3>
         <p className="text-sm text-slate-500 mb-6">{user?.email}</p>
 
@@ -97,13 +93,14 @@ const CloudSettings: React.FC<CloudSettingsProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm transition-all">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+    <MotionPresence show={isOpen} onDismiss={onClose}>
+    <div className="dialog-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+      <div role="dialog" aria-modal="true" aria-label={user ? '帳號資訊' : '登入'} className="dialog-panel bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-10">
           <h3 className="text-lg font-bold text-slate-800">
             {user ? '帳號資訊' : '登入'}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors">
+          <button aria-label="關閉登入視窗" onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -113,6 +110,7 @@ const CloudSettings: React.FC<CloudSettingsProps> = ({
         </div>
       </div>
     </div>
+    </MotionPresence>
   );
 };
 

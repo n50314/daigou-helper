@@ -21,6 +21,15 @@
 
 手機使用卡片操作，桌面使用表格；商品分類列支援觸控橫向捲動。
 
+選單指示會滑動至目前頁面，彈窗有進出過場，金額與採購進度會平滑更新。儲存及匯出以可關閉的通知回饋；雲端同步完成只在收到儲存結果後提示。介面支援鍵盤操作與系統的「減少動態效果」設定。
+
+<details>
+<summary>操作動態預覽（虛構示範資料）</summary>
+
+![頁面切換、採購進度、彈窗與操作回饋](docs/images/motion-preview.gif)
+
+</details>
+
 <details>
 <summary>更多畫面：商品管理、訂單管理與手機採購</summary>
 
@@ -79,6 +88,7 @@ npm test                # 22 項業務與同步單元測試
 npm run test:ui         # 390／768／1440px 介面、搜尋、規格與 Excel
 npm run test:purchase   # 採購篩選、勾選持久化與匯出
 npm run test:upgrade    # 草稿隔離、封存、分類移轉、舊價格與歷史檔期
+npm run test:motion     # 快速切換、滑動指示、彈窗焦點、進度及減少動態效果
 ```
 
 瀏覽器測試需先啟動 4173 的預覽服務，並安裝 Google Chrome。測試全程使用虛構資料。

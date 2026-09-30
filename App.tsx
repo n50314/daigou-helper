@@ -12,6 +12,9 @@ import { validateWorkspaceImport, currencyOf, costRateOf } from './services/cata
 import { accessibleBatches, removeOrArchiveBatch, transferCategory } from './services/business';
 import { demoWorkspace } from './services/demo';
 import { draftKey } from './services/orderDraft';
+import { FeedbackProvider, useFeedback } from './components/Feedback';
+import { WorkspaceTabs, type WorkspaceTab } from './components/WorkspaceTabs';
+import { AnimatedNumber, MotionPresence } from './components/Motion';
 
 const CONTACT_FORM_URL = "https://forms.gle/5ygYpvGrJLR4cKDd7";
 
@@ -26,16 +29,22 @@ function App() {
     return subscribeToAuthChanges(setUser);
   }, []);
   if (user === undefined) return <div className="p-8 text-center text-slate-500">正在確認登入帳號…</div>;
-  return <AccountWorkspace key={user?.uid || 'guest'} user={user} />;
+  return <FeedbackProvider key={user?.uid || 'guest'}><AccountWorkspace user={user} /></FeedbackProvider>;
 }
 
 function AccountWorkspace({ user }: { user: UserProfile | null }) {
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'summary'>('orders');
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('orders');
+  const notify = useFeedback();
   const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
   const [detachedBatchId, setDetachedBatchId] = useState('');
 
   const workspace = useAccountWorkspace(user?.uid || null);
   const { data, status: saveStatus, editable, message } = workspace;
+  const previousSave = useRef(saveStatus);
+  useEffect(() => {
+    if (user && saveStatus === 'saved' && ['saving', 'pending'].includes(previousSave.current)) notify('雲端同步完成', '目前帳號的修改已儲存');
+    previousSave.current = saveStatus;
+  }, [saveStatus, notify, user?.uid]);
   const { batches, products, orders, activeBatchId, memberGroups, productTypes, costRate, purchaseChecks } = data;
   const setBatches = workspace.setField('batches');
   const setProducts = workspace.setField('products');
@@ -76,6 +85,7 @@ function AccountWorkspace({ user }: { user: UserProfile | null }) {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     setIsUserMenuOpen(false);
+    notify('備份已下載', '請將 JSON 檔案保存在安全的位置');
   };
 
   const handleRawBackup = () => {
@@ -112,7 +122,7 @@ function AccountWorkspace({ user }: { user: UserProfile | null }) {
             const imported = normalizeWorkspace(json);
             validateWorkspaceImport(imported);
             if(window.confirm(`匯入對象：${user ? user.email : '本機訪客'}\n檔期 ${imported.batches.length} 個、商品 ${imported.products.length} 件、訂單 ${imported.orders.length} 筆。\n目前有 ${orders.length} 筆訂單。這會取代目前資料，取代前會保留本機備份。確定匯入？`)) {
-                if (workspace.replaceData(imported)) alert('資料已匯入，帳號資料會依同步狀態儲存。');
+                if (workspace.replaceData(imported)) notify('資料已匯入', '請依畫面的同步狀態確認雲端儲存');
             }
         } catch (err) {
             alert(err instanceof Error ? err.message : '無法讀取檔案，目前資料未更動。');
@@ -200,6 +210,7 @@ function AccountWorkspace({ user }: { user: UserProfile | null }) {
                    <div className="relative" ref={userMenuRef}>
                         <button
                             aria-label="帳號選單"
+                            aria-expanded={isUserMenuOpen}
                             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                             className="flex items-center gap-2 hover:bg-slate-50 rounded-full p-1 pr-3 border border-transparent hover:border-slate-200 transition-all"
                         >
@@ -213,8 +224,8 @@ function AccountWorkspace({ user }: { user: UserProfile | null }) {
                             <ChevronDown className="w-4 h-4 text-slate-400" />
                         </button>
 
-                        {isUserMenuOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                        <MotionPresence show={isUserMenuOpen} onDismiss={() => setIsUserMenuOpen(false)}>
+                            <div className="account-popover absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50">
                                 {user ? (
                                     <div className="px-4 py-3 border-b border-slate-100 mb-2">
                                         <p className="text-sm font-bold text-slate-800 truncate">{user.displayName}</p>
@@ -270,37 +281,17 @@ function AccountWorkspace({ user }: { user: UserProfile | null }) {
                                     </>
                                 )}
                             </div>
-                        )}
+                        </MotionPresence>
                    </div>
               </div>
             </div>
 
-            {/* Mobile Tab Navigation */}
-            <div className="flex md:hidden border-t border-slate-200 mt-2 pt-1 gap-1 overflow-x-auto no-scrollbar">
-                <button
-                    onClick={() => setActiveTab('orders')}
-                    className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap ${activeTab === 'orders' ? 'bg-blue-50 text-blue-600' : 'text-slate-500'}`}
-                >
-                    <ShoppingBag className="w-4 h-4" /> 訂單管理
-                </button>
-                <button
-                    onClick={() => setActiveTab('products')}
-                    className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap ${activeTab === 'products' ? 'bg-blue-50 text-blue-600' : 'text-slate-500'}`}
-                >
-                    <LayoutDashboard className="w-4 h-4" /> 商品設定
-                </button>
-                <button
-                    onClick={() => setActiveTab('summary')}
-                    className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap ${activeTab === 'summary' ? 'bg-blue-50 text-blue-600' : 'text-slate-500'}`}
-                >
-                    <ClipboardList className="w-4 h-4" /> 採購清單
-                </button>
-            </div>
+            <WorkspaceTabs compact active={activeTab} onChange={setActiveTab} />
           </div>
         </div>
       </nav>
 
-      <div className="flex-1 flex w-full p-4 md:p-6 gap-6 items-start">
+      <div className="app-layout flex-1 flex w-full p-4 md:p-6 gap-6 items-start">
          {SHOW_ADS && <AdSpace position="left" />}
 
          <main className="flex-1 min-w-0 w-full">
@@ -315,7 +306,7 @@ function AccountWorkspace({ user }: { user: UserProfile | null }) {
                   {!batches.length && <option value="">尚無檔期</option>}
                   {displayBatches.map(batch => <option key={batch.id} value={batch.id}>{batch.name}{batch.archived && !batch.missingMetadata ? '（已封存）' : ''} · {currencyOf(batch)}</option>)}
                 </select>
-                {!user && <button disabled={!editable} className="text-sm px-3 py-2 text-blue-600 border border-blue-200 rounded-lg" onClick={() => { if (confirm('載入一般代購示範資料？會先備份並取代本機訪客資料，不會更動已綁定帳號。')) workspace.replaceData(demoWorkspace()); }}>載入示範資料</button>}
+                {!user && <button disabled={!editable} className="text-sm px-3 py-2 text-blue-600 border border-blue-200 rounded-lg" onClick={() => { if (confirm('載入一般代購示範資料？會先備份並取代本機訪客資料，不會更動已綁定帳號。')) { workspace.replaceData(demoWorkspace()); notify('示範資料已載入', '僅使用本機訪客工作區'); } }}>載入示範資料</button>}
               </div>
             </div>
             {displayBatches.some(b => b.missingMetadata) && !activeBatch?.missingMetadata && <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-lg mb-4">有歷史資料缺少檔期設定，內容仍保留。可在「目前檔期」選擇未歸檔歷史資料查詢。</p>}
@@ -332,29 +323,17 @@ function AccountWorkspace({ user }: { user: UserProfile | null }) {
                 {saveStatus !== 'loading' && <button onClick={handleRawBackup} className="ml-3 underline">下載原始快取</button>}
               </div>
             )}
-            {/* Desktop Tabs */}
-            <div className="hidden md:flex mb-6 bg-white p-1 rounded-xl shadow-sm border border-slate-200 w-fit">
-                 <button
-                    onClick={() => setActiveTab('orders')}
-                    className={`px-5 py-2.5 text-sm font-bold rounded-lg flex items-center gap-2 transition-all ${activeTab === 'orders' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
-                >
-                    <ShoppingBag className="w-4 h-4" /> 訂單管理
-                </button>
-                <button
-                    onClick={() => setActiveTab('products')}
-                    className={`px-5 py-2.5 text-sm font-bold rounded-lg flex items-center gap-2 transition-all ${activeTab === 'products' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
-                >
-                    <LayoutDashboard className="w-4 h-4" /> 商品與檔期設定
-                </button>
-                <button
-                    onClick={() => setActiveTab('summary')}
-                    className={`px-5 py-2.5 text-sm font-bold rounded-lg flex items-center gap-2 transition-all ${activeTab === 'summary' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
-                >
-                    <ClipboardList className="w-4 h-4" /> 採購彙整表
-                </button>
+            <WorkspaceTabs active={activeTab} onChange={setActiveTab} />
+            <div className="page-intro">
+              <div><h2>{activeTab === 'orders' ? '訂單管理' : activeTab === 'products' ? '商品與檔期' : '採購彙整'}</h2>
+                <p>{activeTab === 'orders' ? '建立訂單、追蹤付款與出貨，草稿可隨時續填。' : activeTab === 'products' ? '設定商品、分類與匯率，保留每筆歷史成交資料。' : '依商品與規格整理採購數量，掌握進度與商品毛利。'}</p>
+              </div>
+              <div className="workspace-counts" aria-label="目前檔期資料數量">
+                <div><strong><AnimatedNumber value={orders.filter(o => o.batchId === selectedBatchId).length} /></strong><span>筆訂單</span></div>
+                <div><strong><AnimatedNumber value={products.filter(p => p.batchId === selectedBatchId && !p.archived).length} /></strong><span>件商品</span></div>
+              </div>
             </div>
-
-            <fieldset disabled={!editable} className={`min-w-0 animate-in fade-in slide-in-from-bottom-4 duration-300 ${!editable ? 'pointer-events-none opacity-60' : ''}`}>
+            <fieldset id="workspace-panel" key={activeTab} disabled={!editable} className={`page-panel min-w-0 ${!editable ? 'pointer-events-none opacity-60' : ''}`}>
                 {activeTab === 'orders' && (
                     <OrderManager
                         key={selectedBatchId || 'no-batch'}
@@ -372,8 +351,8 @@ function AccountWorkspace({ user }: { user: UserProfile | null }) {
                     <ProductManager
                         orders={orders}
                         legacyCostRate={costRate}
-                        onRemoveBatch={id => workspace.updateData(data => removeOrArchiveBatch(data, id))}
-                        onTransferCategory={(source, target) => { try { workspace.updateData(data => transferCategory(data, source, target)); } catch { alert('分類已更新，請重新選擇移轉目標。目前資料未更動。'); } }}
+                        onRemoveBatch={id => { workspace.updateData(data => removeOrArchiveBatch(data, id)); notify('檔期管理已更新', '既有商品與訂單仍保留'); }}
+                        onTransferCategory={(source, target) => { try { workspace.updateData(data => transferCategory(data, source, target)); notify('分類已移轉', '商品與歷史訂單已保留'); } catch { alert('分類已更新，請重新選擇移轉目標。目前資料未更動。'); } }}
                         products={products}
                         setProducts={setProducts}
                         batches={displayBatches}

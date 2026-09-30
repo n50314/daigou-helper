@@ -21,6 +21,8 @@ interface ProductManagerProps {
 
 import { GENERAL_TYPES, versionOf } from '../services/workspaceData';
 import { CURRENCIES, categoryLabel, currencyOf, costRateOf, validRate } from '../services/catalog';
+import { MotionPresence } from './Motion';
+import { useFeedback } from './Feedback';
 
 const generateId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -191,6 +193,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
   products, setProducts, batches, setBatches, activeBatchId, setActiveBatchId,
   memberGroups, setMemberGroups, productTypes, setProductTypes, orders, legacyCostRate, onRemoveBatch, onTransferCategory
 }) => {
+  const notify = useFeedback();
   const [tab, setTab] = useState<'batches' | 'settings'>('batches');
   const [batchName, setBatchName] = useState('');
   const [batchCurrency, setBatchCurrency] = useState('TWD');
@@ -225,6 +228,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
     if (!batchName.trim() || !validRate(Number(batchRate)) || !validRate(Number(batchCost))) { alert('請填寫檔期名稱與大於 0 的匯率'); return; }
     const batch: Batch = { id: generateId(), name: batchName.trim(), exchangeRate: Number(batchRate), costRate: Number(batchCost), currency: batchCurrency, isActive: true };
     setBatches(prev => [batch, ...prev]); setActiveBatchId(batch.id); setBatchName('');
+    notify('新檔期已建立', '可開始新增商品與接單');
   };
   const removeBatch = (batch: Batch) => {
     const used = products.some(p => p.batchId === batch.id) || orders.some(o => o.batchId === batch.id);
@@ -236,6 +240,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
     const { missingMetadata, ...saved } = editBatch;
     const updated = { ...saved, name: saved.name.trim() };
     setBatches(prev => prev.some(b => b.id === updated.id) ? prev.map(b => b.id === updated.id ? updated : b) : [...prev, updated]); setEditBatch(null);
+    notify('檔期設定已更新', '既有訂單成交價維持原樣');
   };
   const addProduct = (event: React.FormEvent) => {
     event.preventDefault();
@@ -244,12 +249,14 @@ const ProductManager: React.FC<ProductManagerProps> = ({
     if (!productTypes.some(t => t.id === typeId)) { alert('請先建立商品分類'); return; }
     setProducts(prev => [{ id: generateId(), batchId: activeBatch.id, name: productName.trim(), originalPrice: Number(price), productType: typeId, note: note.trim() }, ...prev]);
     setProductName(''); setPrice(''); setNote('');
+    notify('商品已新增', '可在訂單管理選擇此商品');
   };
   const saveProduct = () => {
     if (editProduct && versionOf(products.find(p => p.id === editProduct.id)) !== versionOf(productBaseline)) { alert('商品已被其他視窗更新，已停止覆蓋。請核對輸入後關閉並重新編輯。'); return; }
     if (!editProduct || !editProduct.name.trim() || !Number.isFinite(editProduct.originalPrice) || editProduct.originalPrice < 0) { alert('請填寫名稱與非負價格'); return; }
     if (duplicate(editProduct.name, editProduct.id)) { alert('此檔期已有同名商品'); return; }
     setProducts(prev => prev.map(p => p.id === editProduct.id ? { ...editProduct, name: editProduct.name.trim(), note: editProduct.note?.trim() || '' } : p)); setEditProduct(null);
+    notify('商品已更新', '既有訂單的名稱與成交價保持原樣');
   };
   const removeProduct = (p: Product) => {
     const used = orders.some(o => o.items.some(i => i.productId === p.id));
@@ -274,7 +281,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
       <button onClick={() => setTab('settings')} className={tab === 'settings' ? primary : secondary}>分類與選項設定</button>
     </div>
     {tab === 'settings' ? <div className="grid lg:grid-cols-2 gap-6">
-      <section className="bg-white p-4 md:p-6 border border-slate-200 rounded-xl min-w-0">
+      <section className="surface-panel bg-white p-4 md:p-6 border border-slate-200 rounded-xl min-w-0">
         <h2 className="manager-title text-lg font-bold mb-3">商品類型設定</h2>
         <p className="text-sm text-slate-500 mb-4">一般商品也可選填規格。勾選「必填規格」後，下單需填尺寸、容量或款式。</p>
         <div className="grid sm:grid-cols-2 gap-3 mb-3">
@@ -297,7 +304,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
           <button className={secondary} aria-label={`刪除分類 ${categoryLabel(type)}`} onClick={() => removeType(type.id)}><Trash2 className="w-4 h-4 text-red-500" /></button>
         </div>)}</div>
       </section>
-      <section className="bg-white p-4 md:p-6 border border-slate-200 rounded-xl min-w-0">
+      <section className="surface-panel bg-white p-4 md:p-6 border border-slate-200 rounded-xl min-w-0">
         <h2 className="manager-title text-lg font-bold mb-3">選項群組設定（選用）</h2>
         <p className="text-sm text-slate-500 mb-4">依品牌、系列或型號建立固定選項；已存在的選項與訂單規格會繼續保留。</p>
         <div className="flex gap-2 mb-5"><input placeholder="新增群組（例：品牌、系列）" className={inputClass} value={groupName} onChange={e => setGroupName(e.target.value)} />
@@ -309,7 +316,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
       </section>
     </div> : <div className="grid lg:grid-cols-12 gap-6 items-start">
       <section className="lg:col-span-4 space-y-4 min-w-0">
-        <div className="bg-white p-4 md:p-6 border border-slate-200 rounded-xl">
+        <div className="surface-panel bg-white p-4 md:p-6 border border-slate-200 rounded-xl">
           <h2 className="manager-title text-lg font-bold mb-4">檔期管理</h2>
           <div className="space-y-2 mb-5">{batches.map(batch => <div key={batch.id} className={`p-3 rounded-lg border ${batch.id === activeBatchId ? 'border-blue-500' : 'border-slate-200'}`}>
             <button className="text-left w-full min-h-11" onClick={() => setActiveBatchId(batch.id)}><span className="font-medium break-words">{batch.name}</span>{batch.archived && <span className="text-xs text-slate-500 ml-2">已封存</span>}
@@ -334,7 +341,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
         </div>
       </section>
       <section className="lg:col-span-8 min-w-0 space-y-4">
-        <form onSubmit={addProduct} className="bg-white p-4 md:p-6 border border-slate-200 rounded-xl space-y-4">
+        <form onSubmit={addProduct} className="surface-panel bg-white p-4 md:p-6 border border-slate-200 rounded-xl space-y-4">
           <h2 className="manager-title text-lg font-bold">新增商品</h2>
           <fieldset disabled={!activeBatch || !!activeBatch.archived} className="space-y-4 min-w-0">
             <div role="group" aria-label="商品類型" className="flex flex-nowrap gap-2 overflow-x-auto pb-2 min-w-0 touch-pan-x">
@@ -348,7 +355,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-500">台幣售價：{activeBatch && price !== '' ? `$${Math.ceil(Number(price) * activeBatch.exchangeRate).toLocaleString()}` : '—'}</p><button type="submit" className={primary}>新增</button></div>
           </fieldset>
         </form>
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="surface-panel bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div className="p-4 flex flex-wrap justify-between gap-3 items-center border-b border-slate-200"><h2 className="text-lg font-bold">商品清單 <span className="text-sm font-normal text-slate-500">{shownProducts.length} 件</span></h2>
             <label className="text-sm text-slate-500 flex items-center gap-2"><input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} />顯示已封存商品</label></div>
           <div className="md:hidden divide-y divide-slate-100">{shownProducts.map(p => <article key={p.id} className="p-4 space-y-3">
@@ -362,7 +369,8 @@ const ProductManager: React.FC<ProductManagerProps> = ({
         </div>
       </section>
     </div>}
-    {editProduct && <div className="modal-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="edit-product-title" className="modal-panel space-y-4">
+    <MotionPresence show={!!editProduct} onDismiss={() => setEditProduct(null)}>
+      {editProduct && <div className="modal-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="edit-product-title" className="modal-panel space-y-4">
       <h2 id="edit-product-title" className="text-lg font-bold">編輯商品</h2><p className="text-sm text-slate-500">只更新商品資料，既有訂單的名稱、規格與成交價會保持原樣。</p>
       <label className="block text-sm">商品名稱<input aria-label="編輯商品名稱" className={`${inputClass} mt-1`} value={editProduct.name} onChange={e => setEditProduct({ ...editProduct, name: e.target.value })} /></label>
       <label className="block text-sm">原價（{currencyOf(activeBatch)}）<input aria-label="編輯商品原價" type="number" min="0" step="any" className={`${inputClass} mt-1`} value={Number.isNaN(editProduct.originalPrice) ? '' : editProduct.originalPrice} onChange={e => setEditProduct({ ...editProduct, originalPrice: e.target.value === '' ? NaN : Number(e.target.value) })} /></label>
@@ -370,7 +378,9 @@ const ProductManager: React.FC<ProductManagerProps> = ({
       <label className="block text-sm">備註<input aria-label="編輯商品備註" className={`${inputClass} mt-1`} value={editProduct.note || ''} onChange={e => setEditProduct({ ...editProduct, note: e.target.value })} /></label>
       <div className="flex justify-end gap-2"><button className={secondary} onClick={() => setEditProduct(null)}>取消</button><button className={primary} onClick={saveProduct}>儲存商品</button></div>
     </section></div>}
-    {editBatch && <div className="modal-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="edit-batch-title" className="modal-panel space-y-4">
+    </MotionPresence>
+    <MotionPresence show={!!editBatch} onDismiss={() => setEditBatch(null)}>
+      {editBatch && <div className="modal-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="edit-batch-title" className="modal-panel space-y-4">
       <h2 id="edit-batch-title" className="text-lg font-bold">{editBatch.missingMetadata ? '修復歷史檔期' : '編輯檔期'}</h2><p className="text-sm text-slate-500">{editBatch.missingMetadata ? '請核對原始幣別與匯率。將以原檔期編號新增設定，所有既有訂單與商品保持原樣。修復後仍維持封存，可再手動恢復。' : '售價換算率只影響之後加入的商品，既有訂單成交價不變。有商品或訂單的檔期會保留原幣別。'}</p>
       <label className="block text-sm">檔期名稱<input aria-label="編輯檔期名稱" className={`${inputClass} mt-1`} value={editBatch.name} onChange={e => setEditBatch({ ...editBatch, name: e.target.value })} /></label>
       <label className="block text-sm">商品幣別<select aria-label="編輯檔期幣別" disabled={!!batchHasData && !editBatch.missingMetadata} className={`${inputClass} mt-1`} value={currencyOf(editBatch)} onChange={e => setEditBatch({ ...editBatch, currency: e.target.value })}>{CURRENCIES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
@@ -379,11 +389,14 @@ const ProductManager: React.FC<ProductManagerProps> = ({
       {!!memberGroups.length && <fieldset className="border-t pt-3"><legend className="text-sm">適用選項群組（未勾選表示全部）</legend><div className="flex flex-wrap gap-3 mt-2">{memberGroups.map(g => <label key={g.id} className="text-sm flex gap-2 items-center"><input type="checkbox" checked={editBatch.allowedGroupIds?.includes(g.id) || false} onChange={e => setEditBatch({ ...editBatch, allowedGroupIds: e.target.checked ? [...(editBatch.allowedGroupIds || []), g.id] : (editBatch.allowedGroupIds || []).filter(id => id !== g.id) })} />{g.name}</label>)}</div></fieldset>}
       <div className="flex justify-end gap-2"><button className={secondary} onClick={() => setEditBatch(null)}>取消</button><button className={primary} onClick={saveBatch}>儲存檔期</button></div>
     </section></div>}
-    {transferSource && <div className="modal-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="transfer-title" className="modal-panel space-y-4">
+    </MotionPresence>
+    <MotionPresence show={!!transferSource} onDismiss={() => setTransferSource('')}>
+      {transferSource && <div className="modal-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="transfer-title" className="modal-panel space-y-4">
       <h2 id="transfer-title" className="text-lg font-bold">移轉商品後刪除分類</h2><p className="text-sm text-slate-600">「{categoryLabel(productTypes.find(t => t.id === transferSource))}」有 {products.filter(p => p.productType === transferSource).length} 件商品。請選擇新分類，商品與歷史訂單都會保留。</p>
       <select aria-label="移轉至分類" className={inputClass} value={transferTarget} onChange={e => setTransferTarget(e.target.value)}><option value="">請選擇新分類</option>{productTypes.filter(t => t.id !== transferSource).map(t => <option key={t.id} value={t.id}>{categoryLabel(t)}</option>)}</select>
       <div className="flex justify-end gap-2"><button className={secondary} onClick={() => setTransferSource('')}>取消</button><button className={primary} disabled={!transferTarget} onClick={() => { onTransferCategory(transferSource, transferTarget); setTransferSource(''); }}>移轉並刪除分類</button></div>
     </section></div>}
+    </MotionPresence>
   </div>;
 };
 export default ProductManager;
