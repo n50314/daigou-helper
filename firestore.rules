@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 允許使用者讀寫自己的資料 (路徑為 /users/{uid})
+    match /users/{userId} {
+      function ownsData() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+      function currentClient() {
+        return request.resource.data.syncSchemaVersion == 2
+          && request.resource.data.revision is string
+          && request.resource.data.batches is list
+          && request.resource.data.products is list
+          && request.resource.data.orders is list
+          && request.resource.data.memberGroups is list
+          && request.resource.data.productTypes is list
+          && request.resource.data.purchaseChecks is map
+          && request.resource.data.activeBatchId is string
+          && request.resource.data.costRate is number
+          && request.resource.data.costRate >= 0;
+      }
+      allow read, delete: if ownsData();
+      allow create: if ownsData() && currentClient();
+      // Old tabs use merge writes without generating a new revision. Reject them
+      // even after a restored document already contains the new schema marker.
+      allow update: if ownsData() && currentClient()
+        && request.resource.data.revision != resource.data.get('revision', '');
+    }
+
+    // 預設拒絕其他所有存取
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

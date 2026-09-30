@@ -1,0 +1,5 @@
+{
+  "name": "Daigou Helper",
+  "description": "A local-first purchasing agent management tool to track products, exchange rates, and orders with Excel export capabilities.",
+  "requestFramePermissions": []
+}
